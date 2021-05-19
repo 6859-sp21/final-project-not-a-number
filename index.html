@@ -3,44 +3,226 @@
 <html lang="en">
 <head>
     <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src='jquery-3.6.0.min.js'></script>
+<!--    <script src="js/jquery.usmap.js"></script>-->
     <title>COVID Vaccinations</title>
-    <link rel="icon" href=vax.png">
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.2.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.2.0/mapbox-gl.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    </style>
 </head>
 <style>
 
     body {
-        font-family: Helvetica;
-        color: aliceblue;
+        font-family: Helvetica,serif;
+        color: dimgray;
+    }
+    path {
+        stroke-width: 5;
+        fill: none;
+        stroke-linecap:round
     }
     h1,h3 {
         font-weight: lighter;
     }
 
-    .line {
+    .axis path,
+    .axis line {
         fill: none;
-        stroke-width: 4px;
+        stroke: none;
+        stroke-width: 1;
+        font-size:14px;
+
     }
 </style>
 
 
 
-<body style="background-color:darkslategray">
-<h1>US Vaccination Progress: Total</h1>
-<h3>Hover over a line to see exact count.</h3>
+<body style="background-color:whitesmoke">
+<h1 align="center">Compare Trends in COVID-19 Vaccinations</h1>
+<div style="height: 30px"></div>
 <div class="flexbox-container" style="display:flex;">
-    <div class="main" style="flex:1; width: 1000px; height: 100%;">
-        <div id="chart1" style="width:1200px"></div>
-        <div style="height: 70px"></div>
-        <h1>US Vaccination Progress: Distribution by Age</h1>
-        <div id="chart2" style="width:1200px"></div>
+
+    <div class="sidebar" id="my-sidebar" style="flex:1; width: 240px; padding-left:30px;">
+        <h3 align="left">This website presents COVID-19 vaccination rates over time, broken down by US state. <br/><br/>On the right, select the desired metric to be graphed.<br/><br/>Hover over a line to see a state's specific count on a date.<br/><br/> Hover over a state on the map to see only that state's trend (click to hold it). </h3>
     </div>
-    <div class="sidebar" id="my-sidebar" style="flex:1; width: 400px; height: 100%;">
-        <img src="vax.png" height="450px">
+    <div class="sidebar" style="width: 60px"></div>
+    <div class="main" style="flex:1; padding-left: 200px; padding-top: 20px">
+
+        <form id="radios" style="font-size: 24px; font-family: Helvetica; font-weight: lighter">
+            <div><input type="radio" name="choice"  class="my-radio" value="people_vaccinated" checked> People Vaccinated </div>
+            <div><input type="radio" name="choice"  class="my-radio" value="people_fully_vaccinated"> People Fully Vaccinated</div>
+            <div><input type="radio" name="choice" class="my-radio" value="daily_vaccinations"> Daily Vaccinations</div>
+            <div><input type="radio" name="choice"  class="my-radio" value="daily_vaccinations_per_million"> Daily Vaccinations Per Million</div>
+        </form>
     </div>
 </div>
+
+<div id="map" style="height:400px; width: 700px; left:670px; top:450px; border-radius: 2%; border: 4px solid lightgray;"></div>
+<div class="flexbox-container" style="display:flex;">
+    <div class="main" style="flex:1; width: 1440px; height: 100%;">
+        <div style="height: 20px"></div>
+        <div id="my-tooltip" style="height: 70px; color: darkred; font-size: 30px" align="center">No state selected</div>
+        <div id="chart1" style="width:640px"></div>
+    </div>
+</div>
+<!--<div id="chart2" style="width:1200px"></div>-->
 <script>
-    const margin = {top: 200, right: 20, bottom: 30, left: 110},
-        width = 960 - margin.left - margin.right,
+    var currentState = null;
+    var clicked=false;
+    var x = {
+        aInternal: 60,
+        aListener: function(val) {},
+        set a(val) {
+            this.aInternal = val;
+            this.aListener(val);
+        },
+        get a() {
+            return this.aInternal;
+        },
+        registerListener: function(listener) {
+            this.aListener = listener;
+        }
+    }
+
+    var mapstuff=function() {
+    mapboxgl.accessToken = 'pk.eyJ1IjoiY2hlc3NhbmgiLCJhIjoiY2tvdjAyN3puMDM3ODJ3cGhpb2o0MHY3cyJ9.Q8Icmb6hwjcNUcRb98cXbQ';
+    var map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v11',
+        center: [-110.486052, 47.830348],
+        zoom: 2,
+        maxZoom: 6.5,
+        minZoom: 1.4,
+    });
+    var hoveredStateId = null;
+
+    map.on('load', function () {
+        map.addSource('states', {
+            'type': 'geojson',
+            'data': 'https://docs.mapbox.com/mapbox-gl-js/assets/us_states.geojson'
+        })
+
+// The feature-state dependent fill-opacity expression will render the hover effect
+// when a feature's hover state is set to true.
+        map.addLayer({
+            'id': 'state-fills',
+            'type': 'fill',
+            'source': 'states',
+            'layout': {},
+            'paint': {
+                'fill-color': '#627BC1',
+                'fill-opacity': [
+                    'case',
+                    ['boolean', ['feature-state', 'hover'], false],
+                    1,
+                    0.5
+                ]
+            }
+        });
+
+        map.addLayer({
+            'id': 'state-borders',
+            'type': 'line',
+            'source': 'states',
+            'layout': {},
+            'paint': {
+                'line-color': '#627BC1',
+                'line-width': 2
+            }
+        });
+
+// When the user moves their mouse over the state-fill layer, we'll update the
+// feature state for the feature under the mouse.
+        map.on('mousemove', 'state-fills', function (e) {
+            if (!clicked) {
+                if (e.features.length > 0) {
+                    if (hoveredStateId !== null) {
+                        map.setFeatureState(
+                            {source: 'states', id: hoveredStateId},
+                            {hover: false}
+                        );
+                    }
+                    hoveredStateId = e.features[0].id
+                    // clicked=false;
+                    currentState = e.features[0].properties.STATE_NAME === "New York" ? "New York State" : e.features[0].properties.STATE_NAME;
+                    x.a = true;
+                    map.setFeatureState(
+                        {source: 'states', id: hoveredStateId},
+
+                        {hover: true}
+                    );
+
+                }
+            }
+        });
+        map.on('click', 'state-fills', function (e) {
+
+            if (e.features.length > 0) {
+                if (clicked && e.features[0].properties.STATE_NAME===currentState) {
+                    if (hoveredStateId !== null) {
+                        map.setFeatureState(
+                            {source: 'states', id: hoveredStateId},
+                            {hover: false}
+                        );
+                    }
+                    hoveredStateId = null;
+                    currentState = null;
+                    x.a = false;
+                    clicked=false;
+                } else {
+                    if (hoveredStateId !== null) {
+                        map.setFeatureState(
+                            {source: 'states', id: hoveredStateId},
+                            {hover: false}
+                        );
+                    }
+                    hoveredStateId = e.features[0].id
+                    currentState = e.features[0].properties.STATE_NAME === "New York" ? "New York State" : e.features[0].properties.STATE_NAME;
+                    x.a = true;
+                    clicked = true;
+                    map.setFeatureState(
+                        {source: 'states', id: hoveredStateId},
+
+                        {hover: true}
+                    );
+                }
+            }
+        });
+
+// When the mouse leaves the state-fill layer, update the feature state of the
+// previously hovered feature.
+        map.on('mouseleave', 'state-fills', function () {
+            if (!clicked) {
+                if (hoveredStateId !== null) {
+                    map.setFeatureState(
+                        {source: 'states', id: hoveredStateId},
+                        {hover: false}
+                    );
+                }
+                hoveredStateId = null;
+                currentState = null;
+                x.a = false;
+            }
+        });
+    });};
+    mapstuff();
+
+
+
+
+
+
+
+    //****************************************************************************************************
+    //****************************************************************************************************
+
+    //d3stuff
+    const margin = {top: 20, right: 20, bottom: 30, left: 70},
+        width = 640 - margin.left - margin.right,
         height = 500 - margin.top - margin.bottom;
 
     // svg to contain chart
@@ -51,188 +233,188 @@
         .attr("transform",
             `translate(${margin.left}, ${margin.top})`);
 
-    var svg2 = d3.select('#chart2').append('svg')
-        .attr('width', width + margin.left + margin.right)
-        .attr('height', height + margin.top + margin.bottom+100)
-        .append("g")
-        .attr("transform",
-            `translate(${margin.left}, ${margin.top})`);
+    // var svg2 = d3.select('#chart2').append('svg')
+    //     .attr('width', width + margin.left + margin.right)
+    //     .attr('height', height + margin.top + margin.bottom+100)
+    //     .append("g")
+    //     .attr("transform",
+    //         `translate(${margin.left}, ${margin.top})`);
 
-    var parseTime = d3.timeParse("%m/%d/%y");
+    var parseTime = d3.timeParse("%Y-%m-%d");
+    var formatTime = d3.timeFormat("%B %d");
+    var tooltip = d3.select("#my-tooltip")
+        .attr("class", "tooltip")
+        .style("text-align", "center");
 
-    d3.csv("trends.csv").then((rawData) => {
-        var data = rawData.filter(d => d["Program"] === "US").filter(d => d["Date Type"] === "Admin")
+
+    d3.csv("https://covid.ourworldindata.org/data/vaccinations/us_state_vaccinations.csv").then((data) => {
+        var valueToMap = "daily_vaccinations";
         data.forEach(function(d) {
-            d.daily_full = +d["Daily Count of People Fully Vaccinated"];
-            d.total_full = +d["People Fully Vaccinated Cumulative"];
-            d.avg_full = +d["7-Day Avg Daily Count of People Fully Vaccinated"];
-            d.date = parseTime(d["Date"]);
+            d.date = parseTime(d.date);
+            d.metric= +d[valueToMap];
         });
+        data=data.filter(d=>d.location != "United States");
+        var per_state = Array.from(d3.group(data, d => d.location), ([key,value]) =>({key, value}));
 
+        graph();
+        d3.select("#radios").on("change",function () {
+            console.log("hi");
+            svg.selectAll("*").remove().transition().duration(500);
+            const rbs = document.querySelectorAll('input[name="choice"]');
+            let selectedValue;
+            for (const rb of rbs) {
+                if (rb.checked) {
+                    selectedValue = rb.value;
+                    break;
+                }
+            }
+            valueToMap = selectedValue;
+            data.forEach(function(d) {
+                d.date = parseTime(d.date);
+                d.metric= +d[valueToMap];
+            });
+            per_state = Array.from(d3.group(data, d => d.location), ([key,value]) =>({key, value}));
+            graph();
+        });
         function graph() {
             var xScale = d3.scaleTime()
                 .domain(d3.extent(data, d=>d.date))
-                .range([0, width]).nice();
-            svg.append("g")
+                .range([0, width]);
+            var xAxis = svg.append("g")
                 .attr("transform", `translate(0, ${height})`)
-                .call(d3.axisBottom(xScale).ticks(5).tickFormat(d3.timeFormat("%b %_d"))).style("font-size","18px");
+                .attr("class", "axis").style("font-size", "13px")
+                .call(d3.axisBottom(xScale).ticks(5).tickFormat(d3.timeFormat("%b %_d")))
+
 
             var yScale = d3.scaleLinear()
-                .domain(d3.extent(data, d=>d.daily_full))
+                .domain(d3.extent(data, d=>d.metric))
                 .range([height, 0]);
-            svg.append("g")
-                .call(d3.axisLeft(yScale)).style("font-size","20px");
+            var yAxis = svg.append("g")
+                .call(d3.axisLeft(yScale)).style("font-size", "13px")
+                .attr("class", "axis")
+                .append('text')
+                .attr('transform',`translate(0, 10)`)
+                .attr('text-anchor', 'end')
+                // .attr("transform", `translate(20, 0)`)
+                .attr('fill', 'gray')
+                .attr('font-size', '20px')
+                .text('Count');
+
+            var colorScale = d3.scaleOrdinal(d3.schemeCategory10)
 
             var makeLine = d3.line()
                 .x(d => xScale(d.date))
-                .y(d => yScale(d.daily_full))
-                .defined(d => d.daily_full != 0).curve(d3.curveCardinal.tension(0));
+                .y(d => yScale(d.metric))
+                .defined(d => d.metric != 0)
+                .curve(d3.curveCardinal.tension(0));
 
-            svg.append("path")
-                .data([data])
-                .attr("class", "line")
-                .attr("stroke", "steelblue")
-                .attr("d", makeLine)
-                .on('mouseover', mouseover)
-                .on('mousemove', mousemove)
-                .on('mouseout', mouseout);
+            per_state.forEach(function(d,i){
+                svg.append("path")
+                    .attr("class", "line")
+                    .style("stroke", function() { return d.color = colorScale(d.key); })
+                    .attr("d", makeLine(d.value))
+                    .on("mouseover", function(event) {
+                        tooltip.transition()
+                        .duration(200)
+                            .style("opacity", .9);
+                        tooltip.html(d.key + ", " + formatTime(xScale.invert(d3.pointer(event)[0]))+": " + Math.round(yScale.invert(d3.pointer(event)[1])).toLocaleString());
+                    })
+                    .on("mouseout", function(event, d) {
+                        tooltip.html("No state selected");
+                    });
+            });
+        };
 
-            var makeLine3 = d3.line()
-                .x(d => xScale(d.date))
-                .y(d => yScale(d.avg_full))
-                .defined(d => d.daily_full != 0).curve(d3.curveCardinal.tension(0));
+        x.registerListener(function(val) {
+            if (val) {
+                svg.selectAll("*").remove().transition().duration(500);
+                per_state = Array.from(d3.group(data.filter(d => d.location === currentState), d => d.location), ([key,value]) =>({key, value}));
+                document.getElementById("my-tooltip").innerHTML = currentState;
+                graph();
 
-            svg.append("path")
-                .data([data])
-                .attr("class", "line")
-                .attr("stroke", "green")
-                .attr("d", makeLine3)
-
-            var bisect = d3.bisector(d => d.date).left;
-
-            var focus = svg
-                .append('g')
-                .append('circle')
-                .style("fill", "skyblue")
-                .attr("stroke", "none")
-                .attr('r', 8.5)
-                .style("opacity", 0)
-
-            var focusText = svg
-                .append('g')
-                .append('text')
-                .style("opacity", 0)
-                .style("font-size","20px")
-                .attr('fill', 'white')
-                .attr("text-anchor", "left")
-                .attr("alignment-baseline", "middle");
-
-
-            function mouseover() {
-                focus.style("opacity", 1)
-                focusText.style("opacity",1)
+            } else {
+                svg.selectAll("*").remove().transition().duration(500);
+                per_state = Array.from(d3.group(data, d => d.location), ([key,value]) =>({key, value}));
+                document.getElementById("my-tooltip").innerHTML = "No state selected";
+                graph();
             }
-
-            function mousemove(event) {
-                // recover coordinate we need
-                var x0 = xScale.invert(d3.pointer(event)[0]);
-                var i = bisect(data, x0, 1);
-                var selectedData = data[i];
-                focus
-                    .attr("cx", xScale(selectedData.date))
-                    .attr("cy", yScale(selectedData.daily_full))
-                focusText
-                    .html("count:" + selectedData.daily_full)
-                    .attr("x", xScale(selectedData.date)+15)
-                    .attr("y", yScale(selectedData.daily_full))
-            }
-            function mouseout() {
-                focus.style("opacity", 0)
-                focusText.style("opacity", 0)
-            }
-
-            };
-        graph();
-
-
-
-    });
-
-
-    d3.csv("demographics.csv").then((data) => {
-        // var data = rawData.filter(d => d["Program"] === "US").filter(d => d["Date Type"] === "Admin")
-        data.forEach(function(d) {
-            d.doses = +d["People who are fully vaccinated"];
-            d.single_dose = +d["People with at least one dose"];
-            d.date = parseTime(d["Date"]);
-            d.age = d["Age Group"];
         });
-
-        data=data.filter(d=>d.age != "Age_known")
-        data= data.filter(d=>d.age != "Age_unknown")
-        var per_age_group = Array.from(d3.group(data, d => d.age), ([key,value]) =>({key, value}));
-        var categories = ["Ages_65-74_yrs","Ages_50-64_yrs", "Ages_40-49_yrs", "Ages_30-39_yrs",
-            "Ages_18-29_yrs", "Ages_<18yrs"];
-        // console.log(categories);
-
-        // Add X axis
-        var xScale = d3.scaleTime()
-            .domain(d3.extent(data, d=>d.date))
-            .range([0, width]);
-        svg2.append("g")
-            .attr("transform", `translate(0, ${height})`)
-            .call(d3.axisBottom(xScale).ticks(5).tickFormat(d3.timeFormat("%b %_d"))).style("font-size","18px");
-
-        var yScale = d3.scaleLinear()
-            .domain(d3.extent(data, d=>d.doses))
-            .range([height, 0]);
-        // svg.append("g")
-        //     .call(d3.axisLeft(yScale)).style("font-size","20px");
-        var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
-        var makeLine = d3.line()
-            .x(d => xScale(d.date))
-            .y(d => yScale(d.doses))
-            .defined(d => d.doses != 0).curve(d3.curveCardinal.tension(0));
-
-        // Create the Y axis for names
-        var yName = d3.scaleBand()
-            .domain(categories)
-            .range([0, height])
-            .paddingInner(1)
-        svg2.append("g")
-            .call(d3.axisLeft(yName)).style("font-size","20px");
-
-        // Compute kernel density estimation for each column:
-        // var kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(40)) // increase this 40 for more accurate density.
-        // var allDensity = []
-        // per_age_group.forEach(function(d,i) {
-        //     svg2.append("path")
-        //         .attr("class", "line")
-        //         .attr("transform", function(d){return("translate(0," + (yName(d.key)-height) +")" )})
-        //         .style("stroke", function() {
-        //             return d.color = colorScale(d.key); })
-        //         .attr("d", makeLine(d.value))
-        // })
-
-
-        // for (i = 0; i < n; i++) {
-        //     key = categories[i]
-        //     density = kde( data.map(function(d){  return d[key]; }) )
-        //     allDensity.push({key: key, density: density})
-        // }
-        // Add areas
-        svg2.selectAll("path")
-            .data(per_age_group)
-            .enter()
-            .append("path")
-            .attr("transform", function(d){return("translate(0," + (yName(d.key)-height) +")" )})
-            .datum(function(d){return(d.value)})
-            .attr("fill", "#69b3a2")
-            .attr("stroke", "#000")
-            .attr("stroke-width", 1)
-            .attr("d",  makeLine)
-
     });
+
+
+
+    // d3.csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/vaccinations.csv").then((data2) => {
+    //     var valueToMap2 = "daily_vaccinations";
+    //     data2.forEach(function(d) {
+    //         d.date = parseTime(d.date);
+    //         d.metric= +d[valueToMap2];
+    //     });
+    //
+    //     data2=data2.filter(d=>!d['iso_code'].toString().includes("OWID"));
+    //     var per_state2 = Array.from(d3.group(data2, d => d.location), ([key,value]) =>({key, value}));
+    //
+    //
+    //     function graph() {
+    //         var xScale2 = d3.scaleTime()
+    //             .domain(d3.extent(data2, d=>d.date))
+    //             .range([0, width]);
+    //         svg2.append("g")
+    //             .attr("transform", `translate(0, ${height})`)
+    //             .call(d3.axisBottom(xScale2).tickFormat(d3.timeFormat("%b %_d"))).style("font-size","14px");
+    //
+    //         var yScale2 = d3.scaleLinear()
+    //             .domain(d3.extent(data2, d=>d.metric))
+    //             .range([height, 0]);
+    //         svg2.append("g")
+    //             .call(d3.axisLeft(yScale2)).style("font-size","20px")
+    //             .attr("class", "axis")
+    //             // .attr("transform", `translate(${width}, 0)`)
+    //             .style("font-size","16px")
+    //         // .append('text')
+    //         // .attr('transform',`rotate(-90)`)
+    //         // .attr('text-anchor', 'end')
+    //         // .attr('fill', 'white')
+    //         // .attr('font-size', '20px')
+    //         // .text('Annual Spending (millions)');
+    //
+    //         var colorScale2 = d3.scaleOrdinal(d3.schemeCategory10)
+    //
+    //         var makeLine2 = d3.line()
+    //             .x(d => xScale2(d.date))
+    //             .y(d => yScale2(d.metric))
+    //             // .defined(d => d[valueToMap] != 0)
+    //             .curve(d3.curveCardinal.tension(0));
+    //
+    //         per_state2.forEach(function(d,i){
+    //             svg2.append("path")
+    //                 .attr("class", "line")
+    //                 .attr("class", "my-line")
+    //                 .style("stroke", function() { return d.color = colorScale2(d.key); })
+    //                 .attr("id", 'tag'+d.key)
+    //                 .attr("d", makeLine2(d.value))
+    //                 .on("mouseover", function(event) {
+    //                     tooltip.transition()
+    //                         .duration(200)
+    //                         .style("opacity", .9);
+    //                     // console.log(d)
+    //                     // console.log(d3.pointer(event))
+    //                     tooltip.html(d.key + "<br/>" + Math.round(yScale2.invert(d3.pointer(event)[1])));
+    //
+    //                 })
+    //                 .on("mouseout", function(event, d) {
+    //                     tooltip.transition()
+    //                         .duration(200)
+    //                         .style("opacity", 0);
+    //                 });
+    //         })
+    //     };
+    //     graph();
+    //
+    // });
+
+
+
 </script>
+
 </body>
 </html>

@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="18f2b6c4-e6cf-451f-996d-bd9bfa4578d6" name="Default Changelist" comment="" />
+    <list default="true" id="18f2b6c4-e6cf-451f-996d-bd9bfa4578d6" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/final-project-not-a-number.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/final-project-not-a-number.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/demographics copy.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/demographics.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scroller.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/trends.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/vax.png" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -38,7 +47,13 @@
     <property name="node.js.selected.package.eslint" value="(autodetect)" />
     <property name="node.js.selected.package.tslint" value="(autodetect)" />
     <property name="nodejs_package_manager_path" value="npm" />
+    <property name="settings.editor.selected.configurable" value="JavaScript.Libraries" />
     <property name="vue.rearranger.settings.migration" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$" />
+    </key>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
@@ -50,7 +65,8 @@
       <updated>1619975519166</updated>
       <workItem from="1619975528208" duration="2189000" />
       <workItem from="1620005310412" duration="11535000" />
-      <workItem from="1620048012847" duration="14071000" />
+      <workItem from="1620048012847" duration="15620000" />
+      <workItem from="1621098188999" duration="38903000" />
     </task>
     <servers />
   </component>
@@ -68,5 +84,9 @@
       </map>
     </option>
     <option name="oldMeFiltersMigrated" value="true" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>
