@@ -54,7 +54,7 @@
         <form id="radios" style="font-size: 24px; font-family: Helvetica; font-weight: lighter">
             <div><input type="radio" name="choice"  class="my-radio" value="people_vaccinated" > People Vaccinated </div>
             <div><input type="radio" name="choice"  class="my-radio" value="people_fully_vaccinated"> People Fully Vaccinated</div>
-            <div><input type="radio" name="choice"  class="my-radio" value="people_fully_vaccinated" checked> People Fully Vaccinated per Hundred</div>
+            <div><input type="radio" name="choice"  class="my-radio" value="people_fully_vaccinated_per_hundred" checked> People Fully Vaccinated per Hundred</div>
             <div><input type="radio" name="choice" class="my-radio" value="daily_vaccinations"> Daily Vaccinations</div>
             <div><input type="radio" name="choice"  class="my-radio" value="daily_vaccinations_per_million"> Daily Vaccinations Per Million</div>
         </form>
@@ -259,15 +259,19 @@
         .style("text-align", "center");
 
 
-    d3.csv("https://covid.ourworldindata.org/data/vaccinations/us_state_vaccinations.csv").then((data) => {
-        var valueToMap = "people_fully_vaccinated_per_hundred";
-        data.forEach(function(d) {
+    d3.csv("https://covid.ourworldindata.org/data/vaccinations/us_state_vaccinations.csv").then((data1) => {
+
+        data1.forEach(function(d) {
             d.date = parseTime(d.date);
-            d.metric= +d[valueToMap];
+            d.metric= +d.people_fully_vaccinated_per_hundred;
+            d.daily_vaccinations=+d.daily_vaccinations;
+            d.daily_vaccinations_per_million=+d.daily_vaccinations_per_million;
+            d.people_vaccinated=+d.people_vaccinated;
+            d.people_fully_vaccinated_per_hundred=+d.people_fully_vaccinated_per_hundred;
+            d.people_fully_vaccinated=+d.people_fully_vaccinated;
         });
-        data=data.filter(d=>d.location != "United States");
+        data=data1.filter(d=>d.location != "United States");
         var per_state = Array.from(d3.group(data, d => d.location), ([key,value]) =>({key, value}));
-        console.log(per_state)
 
         graph();
         d3.select("#radios").on("change",function () {
@@ -281,18 +285,33 @@
                     break;
                 }
             }
-            valueToMap = selectedValue;
-            data.forEach(function(d) {
-                d.date = parseTime(d.date);
-                d.metric= +d[valueToMap];
-            });
-            // console.log(data[0]);
+            if (selectedValue==="daily_vaccinations") {
+                data.forEach(function(d) {
+                    d.metric= d.daily_vaccinations;
+                });
+            } else if (selectedValue==="daily_vaccinations_per_million") {
+                data.forEach(function(d) {
+                    d.metric= d.daily_vaccinations_per_million;
+                });
+            } else if (selectedValue==="people_vaccinated") {
+                data.forEach(function(d) {
+                    d.metric= d.people_vaccinated;
+                });
+            } else if (selectedValue==="people_fully_vaccinated_per_hundred") {
+                data.forEach(function(d) {
+                    d.metric= d.people_fully_vaccinated_per_hundred;
+                });
+            }else if (selectedValue==="people_fully_vaccinated") {
+                data.forEach(function(d) {
+                    d.metric= d.people_fully_vaccinated;
+                });
+            }
             per_state = Array.from(d3.group(data, d => d.location), ([key,value]) =>({key, value}));
-            console.log(per_state);
             graph();
         });
+
         function graph() {
-            var xScale = d3.scaleTime()
+            var xScale = d3.scaleLinear()
                 .domain(d3.extent(data, d=>d.date))
                 .range([0, width]);
             var xAxis = svg.append("g")
@@ -309,19 +328,18 @@
                 .attr("class", "axis")
                 .append('text')
                 .attr('transform',`translate(-10, 0)`)
-                // .attr('text-anchor', 'end')
-                // .attr("transform", `translate(20, 0)`)
                 .attr('fill', 'gray')
                 .attr('font-size', '20px')
                 .text('Count');
 
             var colorScale = d3.scaleOrdinal(d3.schemeCategory10)
 
+
             var makeLine = d3.line()
                 .x(d => xScale(d.date))
-                .y(d => yScale(d.metric))
-                .defined(d => d.metric != 0)
-                .curve(d3.curveCardinal.tension(0));
+                .y(d => yScale(+d.metric))
+                .defined(d => d.metric != 0).curve(d3.curveCardinal.tension(0));
+
 
             per_state.forEach(function(d,i){
                 svg.append("path")
@@ -338,6 +356,7 @@
                         tooltip.html("No state selected");
                     });
             });
+            console.log(data);
         };
 
         x.registerListener(function(val) {
